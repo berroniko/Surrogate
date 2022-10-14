@@ -9,7 +9,7 @@ from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from scipy.stats import loguniform
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 
 from sampler import lhs_sample, random_sample
 
@@ -64,6 +64,9 @@ print()
 # https://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcessRegressor.html#sklearn.gaussian_process.GaussianProcessRegressor
 kernel = DotProduct() + WhiteKernel()
 gpr = GaussianProcessRegressor(kernel=kernel, random_state=0)
+k = 3
+skb_ = SelectKBest(f_regression, k=k)
+gpr = make_pipeline(skb_, gpr)
 gpr.fit(X_train, y_train)
 y_pred_gpr = gpr.predict(X_test)
 print(f"gpr MSE {mean_squared_error(y_true=y_test, y_pred=y_pred_gpr):9.1f}")
