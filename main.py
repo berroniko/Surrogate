@@ -7,7 +7,8 @@ from sklearn import neighbors
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 from sklearn.feature_selection import SelectKBest, f_regression
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from scipy.stats import loguniform
 from sklearn.pipeline import Pipeline
 
 from sampler import lhs_sample, random_sample
@@ -49,8 +50,8 @@ else:
 # regression using SVR (Support Vector Regression)
 param_grid = {
     'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
-    'C': [0.2, 0.8, 1, 2, 4]}
-svr = GridSearchCV(estimator=svm.SVR(), param_grid=param_grid)
+    'C': loguniform(1e0, 1e3)}
+svr = RandomizedSearchCV(estimator=svm.SVR(), param_distributions=param_grid)
 svr.fit(X_train, y_train)
 y_pred = svr.predict(X_test)
 print(f"kernel: {svr.get_params().get('estimator__kernel')}")
@@ -72,7 +73,7 @@ print()
 # regression with nearest neighbors
 # GridSearch
 param_grid = {
-    'n_neighbors': [3, 4, 5, 6, 7, 8],
+    'n_neighbors': [3, 4, 5, 6, 7, 8, 9],
     'weights': ['distance', 'uniform']}
 knn = GridSearchCV(estimator=neighbors.KNeighborsRegressor(), param_grid=param_grid)
 knn.fit(X_train, y_train)
