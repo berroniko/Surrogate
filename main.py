@@ -38,7 +38,7 @@ select_features = False
 
 if select_features:
     k = 2
-    skb = SelectKBest(f_regression, k=k).fit(X=X, y=y_train)
+    skb = SelectKBest(score_func=f_regression, k=k).fit(X=X, y=y_train)
     print(f"The {k} best features: {skb.get_feature_names_out(list(parameters.keys()))}")
     print()
     X_train = skb.transform(X=X)
@@ -64,14 +64,32 @@ print()
 # https://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcessRegressor.html#sklearn.gaussian_process.GaussianProcessRegressor
 kernel = DotProduct() + WhiteKernel()
 gpr = GaussianProcessRegressor(kernel=kernel, random_state=0)
-k = 3
-skb_ = SelectKBest(f_regression, k=k)
-gpr = make_pipeline(skb_, gpr)
-gpr.fit(X_train, y_train)
-y_pred_gpr = gpr.predict(X_test)
-print(f"gpr MSE {mean_squared_error(y_true=y_test, y_pred=y_pred_gpr):9.1f}")
-print(f"gpr R2    {r2_score(y_true=y_test, y_pred=y_pred_gpr):11.2f}")
+pipe = Pipeline(
+    [
+        ("select_feature", "-"),
+        ("classify", gpr),
+    ]
+)
+
+nr_feature_options = list(range(2, len(parameters)+1))
+
+param_grid = [
+    {
+        "select_feature": [SelectKBest(score_func=f_regression)],
+        "select_feature__k": nr_feature_options
+    }
+]
+
+grid = GridSearchCV(pipe, n_jobs=1, param_grid=param_grid)
+grid.fit(X_train, y_train)
+y_pred_gpr = grid.predict(X_test)
+
+print(f"{grid.best_estimator_ = }")
+print(f"{grid.best_params_ = }")
+print(f"grid MSE {mean_squared_error(y_true=y_test, y_pred=y_pred_gpr):9.1f}")
+print(f"grid R2    {r2_score(y_true=y_test, y_pred=y_pred_gpr):11.2f}")
 print()
+
 
 # regression with nearest neighbors
 # GridSearch
