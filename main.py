@@ -27,86 +27,62 @@ def origin_function(x1, x2, x3, x4):
 
 
 # Generate training and test data
-X = lhs_sample(1000, parameter_dict=parameters)
+X_train = lhs_sample(1000, parameter_dict=parameters)
 # X = linear_sample(500, parameter_dict=parameters)
-X_t = random_sample(500, parameter_dict=parameters)
-y_train = [origin_function(*i) for i in X]
-y_test = [origin_function(*i) for i in X_t]
+X_test = random_sample(500, parameter_dict=parameters)
+y_train = [origin_function(*i) for i in X_train]
+y_test = [origin_function(*i) for i in X_test]
 
-# feature selection
-select_features = False
 
-if select_features:
-    k = 2
-    skb = SelectKBest(score_func=f_regression, k=k).fit(X=X, y=y_train)
-    print(f"The {k} best features: {skb.get_feature_names_out(list(parameters.keys()))}")
-    print()
-    X_train = skb.transform(X=X)
-    X_test = skb.transform(X=X_t)
-else:
-    X_train = X
-    X_test = X_t
 
-# regression using SVR (Support Vector Regression)
-param_grid = {
-    'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
-    'C': loguniform(1e0, 1e3)}
-svr = RandomizedSearchCV(estimator=svm.SVR(), param_distributions=param_grid)
-svr.fit(X_train, y_train)
-y_pred = svr.predict(X_test)
-print(f"kernel: {svr.get_params().get('estimator__kernel')}")
-print(f"C: {svr.get_params().get('estimator__C')}")
-print(f"SVR MSE {mean_squared_error(y_true=y_test, y_pred=y_pred):9.1f}")
-print(f"SVR R2    {r2_score(y_true=y_test, y_pred=y_pred):11.2f}")
-print()
+# Automatic regression selection and parameter optimization using Pipeline and GridSearchCV
 
-# regression with Gaussian Process Regressor
+# for regression with Gaussian Process Regressor see:
 # https://scikit-learn.org/stable/modules/generated/sklearn.gaussian_process.GaussianProcessRegressor.html#sklearn.gaussian_process.GaussianProcessRegressor
-kernel = DotProduct() + WhiteKernel()
-gpr = GaussianProcessRegressor(kernel=kernel, random_state=0)
+
 pipe = Pipeline(
     [
         ("select_feature", "-"),
-        ("classify", gpr),
+        ("classify", "-"),
     ]
 )
 
+# possible nr of features:
 nr_feature_options = list(range(2, len(parameters)+1))
 
 param_grid = [
     {
         "select_feature": [SelectKBest(score_func=f_regression)],
-        "select_feature__k": nr_feature_options
+        "select_feature__k": nr_feature_options,
+        "classify": [GaussianProcessRegressor(kernel=DotProduct() + WhiteKernel(), random_state=0)]
+    },
+    {
+        "select_feature": [SelectKBest(score_func=f_regression)],
+        "select_feature__k": nr_feature_options,
+        "classify": [neighbors.KNeighborsRegressor()],
+        "classify__n_neighbors": [3, 4, 5, 6, 7, 8, 9],
+        "classify__weights": ['distance', 'uniform']
+    },
+    {
+        "select_feature": [SelectKBest(score_func=f_regression)],
+        "select_feature__k": nr_feature_options,
+        "classify": [svm.SVR()],
+        "classify__C": [10e-2, 10e-1, 10e0, 10e1, 10e2],
+        "classify__kernel": ['linear', 'poly', 'rbf', 'sigmoid']
     }
 ]
 
-grid = GridSearchCV(pipe, n_jobs=1, param_grid=param_grid)
+grid = GridSearchCV(pipe, n_jobs=1, param_grid=param_grid, scoring='r2')
 grid.fit(X_train, y_train)
-y_pred_gpr = grid.predict(X_test)
+y_pred = grid.predict(X_test)
 
 print(f"{grid.best_estimator_ = }")
 print(f"{grid.best_params_ = }")
-print(f"grid MSE {mean_squared_error(y_true=y_test, y_pred=y_pred_gpr):9.1f}")
-print(f"grid R2    {r2_score(y_true=y_test, y_pred=y_pred_gpr):11.2f}")
+print(f"grid R2    {r2_score(y_true=y_test, y_pred=y_pred):11.2f}")
 print()
 
-
-# regression with nearest neighbors
-# GridSearch
-param_grid = {
-    'n_neighbors': [3, 4, 5, 6, 7, 8, 9],
-    'weights': ['distance', 'uniform']}
-knn = GridSearchCV(estimator=neighbors.KNeighborsRegressor(), param_grid=param_grid)
-knn.fit(X_train, y_train)
-y_pred_knn = knn.predict(X_test)
-print(f"nr of neighbors: {knn.get_params().get('estimator__n_neighbors')}")
-print(f"weights: {knn.get_params().get('estimator__weights')}")
-print(f"knn MSE {mean_squared_error(y_true=y_test, y_pred=y_pred_knn):9.1f}")
-print(f"knn R2    {r2_score(y_true=y_test, y_pred=y_pred_knn):11.2f}")
-print()
 
 # save the Regressor
 with open("regressor.pkl", "wb") as f:
-    pickle.dump(knn, f)
+    pickle.dump(grid, f)
 
-# TODO pipelines for parameter optimization
