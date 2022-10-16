@@ -1,6 +1,8 @@
 import pickle
-import math
+import matplotlib.pyplot as plt
+import numpy as np
 
+from math import sin, pi
 from sklearn import svm
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn import neighbors
@@ -18,17 +20,16 @@ parameters = {
     "x1": (0, 10),
     "x2": (-1, 5),
     "x3": (200, 300),
-    "x4": (-math.pi, math.pi),
+    "x4": (-pi, pi),
 }
 
 
 def origin_function(x1, x2, x3, x4):
-    return x1 ** 3 + (x2 ** 2) * math.sin(x4) + x3 * 2
+    return x1 ** 3 + (x2 ** 2) * sin(x4) + x3 * 2
 
 
 # Generate training and test data
 X_train = lhs_sample(1000, parameter_dict=parameters)
-# X = linear_sample(500, parameter_dict=parameters)
 X_test = random_sample(500, parameter_dict=parameters)
 y_train = [origin_function(*i) for i in X_train]
 y_test = [origin_function(*i) for i in X_test]
@@ -72,7 +73,9 @@ param_grid = [
     }
 ]
 
-grid = GridSearchCV(pipe, n_jobs=1, param_grid=param_grid, scoring='r2')
+# choose n_jobs=-1 to use all available CPUs
+# choose n_jobs= 1 to for debugging
+grid = GridSearchCV(pipe, n_jobs=1, param_grid=param_grid, scoring='r2', verbose=4)
 grid.fit(X_train, y_train)
 y_pred = grid.predict(X_test)
 
